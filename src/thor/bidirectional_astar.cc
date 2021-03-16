@@ -22,7 +22,7 @@ constexpr uint32_t kInitialEdgeLabelCountBD = 1000000;
 // TODO - this is currently set based on some exceptional cases (e.g. routes taking
 // the PA Turnpike which have very long edges). Using a metric based on maximum edge
 // cost creates large performance drops - so perhaps some other metric can be found?
-constexpr float kThresholdDelta = 420.0f;
+constexpr float kThresholdDelta = 60.f; // ~1min //420.0f;
 
 // Relative cost extension to find alternative routes.
 constexpr float kAlternativeCostExtend = 0.1f;
@@ -790,20 +790,19 @@ bool BidirectionalAStar::SetForwardConnection(GraphReader& graphreader, const BD
   // Keep the best ones at the front all others to the back
   best_connections_.emplace_back(CandidateConnection{pred.edgeid(), oppedge, c});
 
-  if (c < best_connections_.front().cost)
-    std::swap(best_connections_.front(), best_connections_.back());
-
   // Set thresholds to extend search
-  if (cost_threshold_ == std::numeric_limits<float>::max()) {
-    float sortcost = std::max(pred.sortcost() + cost_diff_, opp_pred.sortcost());
+  if (cost_threshold_ == std::numeric_limits<float>::max() || c < best_connections_.front().cost) {
     if (desired_paths_count_ == 1) {
-      cost_threshold_ = sortcost + kThresholdDelta;
+      cost_threshold_ = c + kThresholdDelta;
     } else {
-      cost_threshold_ = sortcost + std::max(kAlternativeCostExtend * sortcost, kThresholdDelta);
+      cost_threshold_ = c + std::max(kAlternativeCostExtend * c, kThresholdDelta);
       iterations_threshold_ =
           edgelabels_forward_.size() + edgelabels_reverse_.size() + kAlternativeIterationsDelta;
     }
   }
+
+  if (c < best_connections_.front().cost)
+    std::swap(best_connections_.front(), best_connections_.back());
 
   // setting this edge as connected
   if (expansion_callback_) {
@@ -851,20 +850,19 @@ bool BidirectionalAStar::SetReverseConnection(GraphReader& graphreader, const BD
   // Keep the best ones at the front all others to the back
   best_connections_.emplace_back(CandidateConnection{fwd_edge_id, rev_pred.edgeid(), c});
 
-  if (c < best_connections_.front().cost)
-    std::swap(best_connections_.front(), best_connections_.back());
-
   // Set thresholds to extend search
-  if (cost_threshold_ == std::numeric_limits<float>::max()) {
-    float sortcost = std::max(rev_pred.sortcost(), fwd_pred.sortcost() + cost_diff_);
+  if (cost_threshold_ == std::numeric_limits<float>::max() || c < best_connections_.front().cost) {
     if (desired_paths_count_ == 1) {
-      cost_threshold_ = sortcost + kThresholdDelta;
+      cost_threshold_ = c + kThresholdDelta;
     } else {
-      cost_threshold_ = sortcost + std::max(kAlternativeCostExtend * sortcost, kThresholdDelta);
+      cost_threshold_ = c + std::max(kAlternativeCostExtend * c, kThresholdDelta);
       iterations_threshold_ =
           edgelabels_forward_.size() + edgelabels_reverse_.size() + kAlternativeIterationsDelta;
     }
   }
+
+  if (c < best_connections_.front().cost)
+    std::swap(best_connections_.front(), best_connections_.back());
 
   // setting this edge as connected, sending the opposing because this is the reverse tree
   if (expansion_callback_) {
